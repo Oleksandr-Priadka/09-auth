@@ -18,7 +18,7 @@ export default function NotesClient({ initialTag }: NotesClientProps) {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   
-  const tag = initialTag === 'all' ? undefined : initialTag;
+  const tag = initialTag === 'all' ? '' : initialTag;
 
   useEffect(() => {
     const timer = setTimeout(() => {

@@ -24,14 +24,9 @@ export async function fetchNoteById(id: string): Promise<Note> {
   return response.data;
 }
 
-export async function checkSession(): Promise<User | null> {
-  try {
-    const config = await getAuthHeaders();
-    const response = await api.get('/auth/session', config);
-    return response.data || null;
-  } catch {
-    return null;
-  }
+export async function checkSession() {
+  const config = await getAuthHeaders();
+  return await api.get('/auth/session', config);
 }
 
 export async function getMe(): Promise<User> {
