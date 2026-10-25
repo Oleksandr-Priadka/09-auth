@@ -16,11 +16,12 @@ export async function proxy(request: NextRequest) {
   const isPublic = publicRoutes.some((route) => pathname.startsWith(route));
 
   let isAuthenticated = !!accessToken;
+  let sessionResponse = null as Awaited<ReturnType<typeof checkSession>> | null;
 
   if (!accessToken && refreshToken) {
     try {
-      const res = await checkSession();
-      if (res && res.status === 200) {
+      sessionResponse = await checkSession();
+      if (sessionResponse && sessionResponse.status === 200) {
         isAuthenticated = true;
       }
     } catch {
@@ -28,20 +29,40 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  let response = NextResponse.next();
+
   if (isPrivate && !isAuthenticated) {
-    return NextResponse.redirect(new URL('/sign-in', request.url));
+    response = NextResponse.redirect(new URL('/sign-in', request.url));
+  } else if (isPublic && isAuthenticated) {
+    response = NextResponse.redirect(new URL('/profile', request.url));
   }
 
-  if (isPublic && isAuthenticated) {
-    return NextResponse.redirect(new URL('/profile', request.url));
-  }
+  if (sessionResponse && sessionResponse.headers) {
+    const headers = sessionResponse.headers as Record<string, unknown>;
+    const setCookieHeader = headers['set-cookie'] || (typeof headers.get === 'function' ? headers.get('set-cookie') : undefined);
 
-  const response = NextResponse.next();
+    if (setCookieHeader) {
+      if (Array.isArray(setCookieHeader)) {
+        setCookieHeader.forEach((cookie) => {
+          if (typeof cookie === 'string') {
+            response.headers.append('set-cookie', cookie);
+          }
+        });
+      } else if (typeof setCookieHeader === 'string') {
+        response.headers.set('set-cookie', setCookieHeader);
+      }
+    }
+  }
 
   const updatedCookies = await cookies();
   const newAccessToken = updatedCookies.get('accessToken');
+  const newRefreshToken = updatedCookies.get('refreshToken');
+
   if (newAccessToken && newAccessToken.value !== accessToken?.value) {
     response.cookies.set('accessToken', newAccessToken.value);
+  }
+  if (newRefreshToken && newRefreshToken.value !== refreshToken?.value) {
+    response.cookies.set('refreshToken', newRefreshToken.value);
   }
 
   return response;
