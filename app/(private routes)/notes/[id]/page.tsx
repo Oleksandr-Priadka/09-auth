@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { fetchNoteById } from '@/lib/clientApi';
+import { fetchNoteById } from '@/lib/api/clientApi';
 import NoteDetailsClient from './NoteDetails.client';
 
 type Props = {

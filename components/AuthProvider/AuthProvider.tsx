@@ -2,7 +2,7 @@
 
 import { useEffect, ReactNode } from 'react';
 import { useAuthStore } from '@/lib/store/authStore';
-import { checkSession } from '@/lib/clientApi';
+import { checkSession } from '@/lib/api/clientApi';
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const { setUser, clearIsAuthenticated } = useAuthStore();
