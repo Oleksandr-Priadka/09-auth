@@ -2,16 +2,21 @@
 
 import { useEffect, ReactNode } from 'react';
 import { useAuthStore } from '@/lib/store/authStore';
-import { checkSession } from '@/lib/api/clientApi';
+import { checkSession, getMe } from '@/lib/api/clientApi';
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const { setUser, clearIsAuthenticated } = useAuthStore();
 
   useEffect(() => {
     checkSession()
-      .then((user) => {
-        if (user) {
-          setUser(user);
+      .then(async (isValid) => {
+        if (isValid) {
+          try {
+            const userData = await getMe();
+            setUser(userData);
+          } catch {
+            clearIsAuthenticated();
+          }
         } else {
           clearIsAuthenticated();
         }
