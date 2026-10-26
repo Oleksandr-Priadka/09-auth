@@ -34,7 +34,7 @@ export async function proxy(request: NextRequest) {
   if (isPrivate && !isAuthenticated) {
     response = NextResponse.redirect(new URL('/sign-in', request.url));
   } else if (isPublic && isAuthenticated) {
-    response = NextResponse.redirect(new URL('/profile', request.url));
+    response = NextResponse.redirect(new URL('/', request.url));
   }
 
   if (sessionResponse && sessionResponse.headers) {
@@ -52,17 +52,6 @@ export async function proxy(request: NextRequest) {
         response.headers.set('set-cookie', setCookieHeader);
       }
     }
-  }
-
-  const updatedCookies = await cookies();
-  const newAccessToken = updatedCookies.get('accessToken');
-  const newRefreshToken = updatedCookies.get('refreshToken');
-
-  if (newAccessToken && newAccessToken.value !== accessToken?.value) {
-    response.cookies.set('accessToken', newAccessToken.value);
-  }
-  if (newRefreshToken && newRefreshToken.value !== refreshToken?.value) {
-    response.cookies.set('refreshToken', newRefreshToken.value);
   }
 
   return response;
