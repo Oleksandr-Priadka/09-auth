@@ -32,12 +32,14 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next();
 
   if (isPrivate && !isAuthenticated) {
-    response = NextResponse.redirect(new URL('/sign-in', request.url));
-  } else if (isPublic && isAuthenticated) {
-    response = NextResponse.redirect(new URL('/', request.url));
+    return NextResponse.redirect(new URL('/sign-in', request.url));
   }
 
-  if (sessionResponse && sessionResponse.headers) {
+  if (isPublic && isAuthenticated) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  if (sessionResponse?.headers) {
     const headers = sessionResponse.headers as Record<string, unknown>;
     const setCookieHeader = headers['set-cookie'] || (typeof headers.get === 'function' ? headers.get('set-cookie') : undefined);
 
@@ -46,12 +48,26 @@ export async function proxy(request: NextRequest) {
         setCookieHeader.forEach((cookie) => {
           if (typeof cookie === 'string') {
             response.headers.append('set-cookie', cookie);
+            const [cookiePart] = cookie.split(';');
+            const [name, value] = cookiePart.split('=');
+            if (name && value) {
+              response.cookies.set(name.trim(), value.trim());
+            }
           }
         });
       } else if (typeof setCookieHeader === 'string') {
         response.headers.set('set-cookie', setCookieHeader);
+        const [cookiePart] = setCookieHeader.split(';');
+        const [name, value] = cookiePart.split('=');
+        if (name && value) {
+          response.cookies.set(name.trim(), value.trim());
+        }
       }
     }
+  }
+
+  if (sessionResponse && isPrivate && isAuthenticated) {
+    return response;
   }
 
   return response;
