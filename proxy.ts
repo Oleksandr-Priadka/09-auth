@@ -17,7 +17,7 @@ export async function proxy(request: NextRequest) {
   const isPublic = publicRoutes.some((route) => pathname.startsWith(route));
 
   let isAuthenticated = !!accessToken;
-  let sessionResponse = null as Awaited<ReturnType<typeof checkSession>> | null;
+  let sessionResponse: Awaited<ReturnType<typeof checkSession>> | null = null;
 
   if (!accessToken && refreshToken) {
     try {
@@ -30,33 +30,6 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.next();
-
-  if (sessionResponse?.headers) {
-    const headers = sessionResponse.headers as Record<string, unknown>;
-    const setCookieHeader = headers['set-cookie'] || (typeof headers.get === 'function' ? headers.get('set-cookie') : undefined);
-
-    if (setCookieHeader) {
-      const cookiesArray = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
-      
-      cookiesArray.forEach((cookieStr) => {
-        if (typeof cookieStr === 'string') {
-          const parsed = parseSetCookie(cookieStr);
-          if (parsed && parsed.name && parsed.value) {
-            response.cookies.set({
-              name: parsed.name,
-              value: parsed.value,
-              path: parsed.path || '/',
-              httpOnly: parsed.httpOnly,
-              secure: parsed.secure,
-              maxAge: parsed.maxAge,
-            });
-          }
-        }
-      });
-    }
-  }
-
   if (isPrivate && !isAuthenticated) {
     return NextResponse.redirect(new URL('/sign-in', request.url));
   }
@@ -65,19 +38,51 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  if (sessionResponse && isPrivate && isAuthenticated) {
-    return NextResponse.redirect(request.url, {
-      headers: response.headers,
-    });
+  if (sessionResponse && isPublic && isAuthenticated) {
+    const response = NextResponse.redirect(new URL('/', request.url));
+    setCookiesToResponse(sessionResponse, response);
+    return response;
   }
 
-  if (sessionResponse && isPublic && isAuthenticated) {
-    return NextResponse.redirect(new URL('/', request.url), {
-      headers: response.headers,
-    });
+  const response = NextResponse.next();
+
+  if (sessionResponse) {
+    setCookiesToResponse(sessionResponse, response);
   }
 
   return response;
+}
+
+function setCookiesToResponse(
+  sessionResponse: Awaited<ReturnType<typeof checkSession>>,
+  response: NextResponse
+) {
+  const headers = sessionResponse.headers as Record<string, unknown>;
+  const setCookieHeader =
+    headers['set-cookie'] ||
+    (typeof headers.get === 'function' ? headers.get('set-cookie') : undefined);
+
+  if (setCookieHeader) {
+    const cookiesArray = Array.isArray(setCookieHeader)
+      ? setCookieHeader
+      : [setCookieHeader];
+
+    cookiesArray.forEach((cookieStr) => {
+      if (typeof cookieStr === 'string') {
+        const parsed = parseSetCookie(cookieStr);
+        if (parsed && parsed.name && parsed.value) {
+          response.cookies.set({
+            name: parsed.name,
+            value: parsed.value,
+            path: parsed.path || '/',
+            httpOnly: parsed.httpOnly,
+            secure: parsed.secure,
+            maxAge: parsed.maxAge,
+          });
+        }
+      }
+    });
+  }
 }
 
 export const config = {
