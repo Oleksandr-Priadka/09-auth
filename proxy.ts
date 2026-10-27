@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { checkSession } from '@/lib/api/serverApi';
+import { parseSetCookie } from 'cookie';
 
 const privateRoutes = ['/profile', '/notes'];
 const publicRoutes = ['/sign-in', '/sign-up'];
@@ -31,14 +32,6 @@ export async function proxy(request: NextRequest) {
 
   const response = NextResponse.next();
 
-  if (isPrivate && !isAuthenticated) {
-    return NextResponse.redirect(new URL('/sign-in', request.url));
-  }
-
-  if (isPublic && isAuthenticated) {
-    return NextResponse.redirect(new URL('/', request.url));
-  }
-
   if (sessionResponse?.headers) {
     const headers = sessionResponse.headers as Record<string, unknown>;
     const setCookieHeader = headers['set-cookie'] || (typeof headers.get === 'function' ? headers.get('set-cookie') : undefined);
@@ -48,30 +41,28 @@ export async function proxy(request: NextRequest) {
       
       cookiesArray.forEach((cookieStr) => {
         if (typeof cookieStr === 'string') {
-          const [cookiePart, ...optionsParts] = cookieStr.split(';');
-          const [name, value] = cookiePart.split('=');
-          
-          if (name && value) {
-            const options: { path?: string; httpOnly?: boolean; secure?: boolean; maxAge?: number } = {};
-            
-            optionsParts.forEach((part) => {
-              const [optKey, optVal] = part.trim().split('=');
-              const lowerKey = optKey?.toLowerCase();
-              if (lowerKey === 'path') options.path = optVal;
-              if (lowerKey === 'httponly') options.httpOnly = true;
-              if (lowerKey === 'secure') options.secure = true;
-              if (lowerKey === 'maxage') options.maxAge = Number(optVal);
-            });
-
+          const parsed = parseSetCookie(cookieStr);
+          if (parsed && parsed.name && parsed.value) {
             response.cookies.set({
-              name: name.trim(),
-              value: value.trim(),
-              ...options,
+              name: parsed.name,
+              value: parsed.value,
+              path: parsed.path || '/',
+              httpOnly: parsed.httpOnly,
+              secure: parsed.secure,
+              maxAge: parsed.maxAge,
             });
           }
         }
       });
     }
+  }
+
+  if (isPrivate && !isAuthenticated) {
+    return NextResponse.redirect(new URL('/sign-in', request.url));
+  }
+
+  if (isPublic && isAuthenticated) {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   if (sessionResponse && isPrivate && isAuthenticated) {
