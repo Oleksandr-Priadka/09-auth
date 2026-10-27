@@ -61,12 +61,18 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL('/sign-in', request.url));
   }
 
-  if (isPublic && isAuthenticated) {
+  if (isPublic && isAuthenticated && !sessionResponse) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
   if (sessionResponse && isPrivate && isAuthenticated) {
     return NextResponse.redirect(request.url, {
+      headers: response.headers,
+    });
+  }
+
+  if (sessionResponse && isPublic && isAuthenticated) {
+    return NextResponse.redirect(new URL('/', request.url), {
       headers: response.headers,
     });
   }
