@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  let response = NextResponse.next();
+  const response = NextResponse.next();
 
   if (isPrivate && !isAuthenticated) {
     return NextResponse.redirect(new URL('/sign-in', request.url));
@@ -44,30 +44,40 @@ export async function proxy(request: NextRequest) {
     const setCookieHeader = headers['set-cookie'] || (typeof headers.get === 'function' ? headers.get('set-cookie') : undefined);
 
     if (setCookieHeader) {
-      if (Array.isArray(setCookieHeader)) {
-        setCookieHeader.forEach((cookie) => {
-          if (typeof cookie === 'string') {
-            response.headers.append('set-cookie', cookie);
-            const [cookiePart] = cookie.split(';');
-            const [name, value] = cookiePart.split('=');
-            if (name && value) {
-              response.cookies.set(name.trim(), value.trim());
-            }
+      const cookiesArray = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader];
+      
+      cookiesArray.forEach((cookieStr) => {
+        if (typeof cookieStr === 'string') {
+          const [cookiePart, ...optionsParts] = cookieStr.split(';');
+          const [name, value] = cookiePart.split('=');
+          
+          if (name && value) {
+            const options: { path?: string; httpOnly?: boolean; secure?: boolean; maxAge?: number } = {};
+            
+            optionsParts.forEach((part) => {
+              const [optKey, optVal] = part.trim().split('=');
+              const lowerKey = optKey?.toLowerCase();
+              if (lowerKey === 'path') options.path = optVal;
+              if (lowerKey === 'httponly') options.httpOnly = true;
+              if (lowerKey === 'secure') options.secure = true;
+              if (lowerKey === 'maxage') options.maxAge = Number(optVal);
+            });
+
+            response.cookies.set({
+              name: name.trim(),
+              value: value.trim(),
+              ...options,
+            });
           }
-        });
-      } else if (typeof setCookieHeader === 'string') {
-        response.headers.set('set-cookie', setCookieHeader);
-        const [cookiePart] = setCookieHeader.split(';');
-        const [name, value] = cookiePart.split('=');
-        if (name && value) {
-          response.cookies.set(name.trim(), value.trim());
         }
-      }
+      });
     }
   }
 
   if (sessionResponse && isPrivate && isAuthenticated) {
-    return response;
+    return NextResponse.redirect(request.url, {
+      headers: response.headers,
+    });
   }
 
   return response;
